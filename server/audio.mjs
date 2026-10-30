@@ -12,9 +12,7 @@ export const languages = {
   ja: "ja",
   zh: "cmn",
   ru: "ru",
-  ar: "ar",
   hi: "hi",
-  tr: "tr",
 };
 import { normalizeText } from "../shared/text.js";
 export { normalizeText } from "../shared/text.js";

@@ -70,7 +70,11 @@ export default function App() {
     if (!synth) return;
     const update = () => setVoices(synth.getVoices());
     synth.addEventListener("voiceschanged", update);
-    return () => synth.removeEventListener("voiceschanged", update);
+    const timers = [250, 1000, 3000].map((delay) => setTimeout(update, delay));
+    return () => {
+      timers.forEach(clearTimeout);
+      synth.removeEventListener("voiceschanged", update);
+    };
   }, []);
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
@@ -94,7 +98,7 @@ export default function App() {
     importInput = useRef(null);
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+    document.documentElement.dir = "ltr";
     try {
       localStorage.setItem("auvioz-language", locale);
     } catch {
@@ -562,26 +566,23 @@ export default function App() {
                 value={options.language}
                 onChange={(value) => option("language", value)}
               />
-              {voices.some(
-                (v) =>
-                  v.lang.toLowerCase().split(/[-_]/)[0] === options.language,
-              ) && (
-                <Choice
-                  label={t.voice}
-                  value={
-                    selectVoice(voices, options.language, options.voiceURI)
-                      ?.voiceURI || ""
-                  }
-                  onChange={(value) => option("voiceURI", value)}
-                  items={voices
-                    .filter(
-                      (v) =>
-                        v.lang.toLowerCase().split(/[-_]/)[0] ===
-                        options.language,
-                    )
-                    .map((v) => ({ value: v.voiceURI, label: v.name }))}
-                />
-              )}
+              <Choice
+                label={t.voice}
+                emptyLabel={t.noVoice}
+                value={
+                  selectVoice(voices, options.language, options.voiceURI)
+                    ?.voiceURI || ""
+                }
+                onChange={(value) => option("voiceURI", value)}
+                items={voices
+                  .filter(
+                    (v) =>
+                      v.lang.toLowerCase().split(/[-_]/)[0] ===
+                      options.language,
+                  )
+                  .map((v) => ({ value: v.voiceURI, label: v.name }))}
+              />
+
               <label className="field">
                 {t.volume}
                 <output>{Math.round(options.volume * 100)}%</output>

@@ -11,10 +11,12 @@ with sync_playwright() as p:
  page.goto('http://127.0.0.1:5174');page.locator('header').wait_for()
  assert page.locator('html').get_attribute('lang')=='es'
  assert page.get_by_text('Frecuencia de muestreo',exact=True).count()==0
+ page.locator('.settings .choice-trigger').nth(1).click()
+ page.get_by_role('option',name='Lucia',exact=True).click()
  page.get_by_role('textbox',name='Texto',exact=True).fill('Hola, prueba del historial.')
  page.get_by_role('button',name='Generar audio').click()
  page.locator('.history-item').wait_for()
- assert page.evaluate('window.__spoken[0].voice')=='jorge'
+ assert page.evaluate('window.__spoken[0].voice')=='lucia'
  page.reload();page.locator('.history-item').wait_for()
  page.locator('.history-item').get_by_role('button',name='▶ Hablar',exact=True).click()
  assert page.locator('.history-timeline output').inner_text().startswith('≈')

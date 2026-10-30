@@ -30,3 +30,21 @@ test("voice selection preserves explicit choice and never crosses language", () 
   assert.equal(selectVoice(voices, "en", "m").voiceURI, "en");
   assert.equal(selectVoice(voices, "ja"), undefined);
 });
+
+test("removed locales cannot be selected or restored as interface language", async () => {
+  const { languages, messages } = await import("../src/i18n.js");
+  assert.equal(languages.length, 10);
+  for (const code of ["ar", "tr"]) {
+    assert.equal(
+      languages.some((l) => l.code === code),
+      false,
+    );
+    assert.equal(messages[code], undefined);
+    globalThis.localStorage = { getItem: () => code };
+    Object.defineProperty(globalThis, "navigator", {
+      value: { languages: [code, "es-ES"] },
+      configurable: true,
+    });
+    assert.equal(initialLanguage(), "es");
+  }
+});

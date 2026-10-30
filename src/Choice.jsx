@@ -5,6 +5,7 @@ export default function Choice({
   onChange,
   items,
   disabled = false,
+  emptyLabel = "—",
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef(null),
@@ -42,7 +43,7 @@ export default function Choice({
       >
         <span id={id + "-value"}>
           {chosen?.flag && <img src={chosen.flag} alt="" />}
-          {chosen?.label || "—"}
+          {chosen?.label || emptyLabel}
         </span>
         <span aria-hidden="true">⌄</span>
       </button>

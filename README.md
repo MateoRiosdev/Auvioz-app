@@ -34,3 +34,7 @@ Banderas locales de [Circle Flags](https://github.com/HatScripts/circle-flags), 
 - Las pruebas del antiguo backend están separadas en `npm run test:audio` y requieren eSpeak/FFmpeg.
 
 El historial incluye una línea de tiempo **aproximada** y saltos de 10 segundos. Web Speech no expone duración ni búsqueda temporal: la posición se calcula con la longitud del texto y la velocidad, y buscar cancela la frase actual y reinicia desde el fragmento correspondiente. No equivale a buscar en un archivo de audio grabado.
+
+## Identificar la versión publicada
+
+Cada build emite `/version.json` con el SHA de Git (en Vercel, `VERCEL_GIT_COMMIT_SHA`). El identificador del despliegue de Vercel es distinto del commit. Para publicar cambios nuevos, comprueba la rama `final` y el commit en la sección Source del despliegue; volver a desplegar un despliegue antiguo conserva su código. No se ha verificado acceso administrativo a Vercel desde este entorno.

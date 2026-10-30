@@ -9,9 +9,7 @@ const labels = {
   ja: "イントロをスキップ",
   zh: "跳过片头",
   ru: "Пропустить заставку",
-  ar: "تخطي المقدمة",
   hi: "इंट्रो छोड़ें",
-  tr: "Girişi atla",
 };
 export default function Intro({ locale, onDone }) {
   const video = useRef(null);

@@ -27,3 +27,7 @@ export function selectVoice(voices, language, uri) {
     matches[0]
   );
 }
+
+export function estimateDuration(text, rate = 1) {
+  return Math.max(1, [...text].length / (12 * rate));
+}

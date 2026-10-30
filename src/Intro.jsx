@@ -27,7 +27,10 @@ export default function Intro({ locale, onDone }) {
     let active = true;
     const timer = setTimeout(onDone, 20000);
     video.current?.play()?.catch(() => {
-      if (active) setBlocked(true);
+      if (active) {
+        clearTimeout(timer);
+        setBlocked(true);
+      }
     });
     const key = (e) => {
       if (e.key === "Escape") onDone();
@@ -48,8 +51,6 @@ export default function Intro({ locale, onDone }) {
       <video
         ref={video}
         src={`/media/Auvioz_app_logo_animation_${source}.mp4`}
-        autoPlay
-        muted
         playsInline
         preload="auto"
         controlsList="nodownload noremoteplayback"
@@ -71,7 +72,7 @@ export default function Intro({ locale, onDone }) {
               .catch(() => setBlocked(true));
           }}
         >
-          ▶
+          ▶ {locale === "es" ? "Reproducir intro" : "Play intro"}
         </button>
       )}
       <button className="intro-skip" onClick={onDone}>

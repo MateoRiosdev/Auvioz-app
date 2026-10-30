@@ -1,6 +1,6 @@
 # Auvioz
 
-**Habla, transcribe y traduce.** Interfaz en 12 idiomas, lista para alojamiento estático en Vercel.
+**Habla, transcribe y traduce.** Interfaz en 10 idiomas, lista para alojamiento estático en Vercel.
 
 ## Desarrollo y despliegue
 
@@ -22,7 +22,7 @@ SpeechRecognition requiere un navegador compatible y permisos; puede usar servic
 
 ## Intro e identidad
 
-Logo original: `public/logo_auvioz.jpg`. Videos originales de seis segundos en `public/media`: `_1.mp4` para hasta 760 px y `_2.mp4` para pantallas mayores. Se reproducen silenciosamente por carga, sin recorte, con omisión y Escape. Si autoplay se bloquea se ofrece reproducir manualmente; un error o espera máxima de 20 segundos permite continuar. Se respeta movimiento reducido. Se bloquean menú contextual y arrastre de la intro; esto no impide extraer los archivos con herramientas de red.
+Logo original: `public/logo_auvioz.jpg`. Videos originales de seis segundos en `public/media`: `_1.mp4` para hasta 760 px y `_2.mp4` para pantallas mayores. Se reproducen con audio reducido al 12% por carga, sin recorte, con omisión y Escape. Si autoplay se bloquea se ofrece reproducir manualmente; un error o espera máxima de 20 segundos permite continuar. Se respeta movimiento reducido. Se bloquean menú contextual y arrastre de la intro; esto no impide extraer los archivos con herramientas de red.
 
 Banderas locales de [Circle Flags](https://github.com/HatScripts/circle-flags), licencia MIT incluida en `public/flags/LICENSE.md`.
 
@@ -32,3 +32,5 @@ Banderas locales de [Circle Flags](https://github.com/HatScripts/circle-flags), 
 - Con `npm run preview -- --port 5174`, ejecutar `python tests/browser_speech.py` (Playwright y Chromium): persistencia, voces, interfaz, idioma, traducción y móvil con un adaptador de voz controlado.
 - `AUVIOZ_TEST_URL=http://127.0.0.1:5174 python tests/intro_browser.py`: reproducción real de ambas intros, omisión, errores y movimiento reducido.
 - Las pruebas del antiguo backend están separadas en `npm run test:audio` y requieren eSpeak/FFmpeg.
+
+El historial incluye una línea de tiempo **aproximada** y saltos de 10 segundos. Web Speech no expone duración ni búsqueda temporal: la posición se calcula con la longitud del texto y la velocidad, y buscar cancela la frase actual y reinicia desde el fragmento correspondiente. No equivale a buscar en un archivo de audio grabado.

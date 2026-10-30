@@ -29,8 +29,8 @@ test("synthesis rejects invalid settings and unbounded text", () => {
   ])
     assert.throws(() => validate(input));
 });
-test("all 12 interface locales have complete translations", () => {
-  assert.equal(languages.length, 12);
+test("all supported interface locales have complete translations", () => {
+  assert.equal(languages.length, 10);
   const keys = Object.keys(messages.es);
   for (const l of languages) {
     assert.deepEqual(Object.keys(messages[l.code]), keys);

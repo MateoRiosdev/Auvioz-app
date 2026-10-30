@@ -1,3 +1,5 @@
+import HistoryControls from "./HistoryControls";
+import { estimateDuration } from "./speech";
 import Choice from "./Choice";
 import { initialLanguage, selectVoice } from "./speech";
 import Intro from "./Intro";
@@ -47,6 +49,7 @@ const freshDefaults = {
 };
 
 export default function App() {
+  const [playback, setPlayback] = useState(null);
   const [showIntro, setShowIntro] = useState(true);
   const finishIntro = useCallback(() => setShowIntro(false), []);
   const [locale, setLocale] = useState(initialLanguage);
@@ -117,7 +120,7 @@ export default function App() {
     };
   }, []);
   const option = (key, value) => setOptions((o) => ({ ...o, [key]: value }));
-  function speakText(value, settings = options) {
+  function speakText(value, settings = options, historyState = null) {
     const normalized = normalizeText(value, settings.clean);
     if (!normalized) {
       setNotice("emptyText");
@@ -138,13 +141,20 @@ export default function App() {
       utteranceRef.current.onerror = null;
     }
     synth.cancel();
+    setPlayback(historyState);
     const utterance = new SpeechSynthesisUtterance(normalized);
     utterance.voice = voice;
     utterance.lang = voice.lang;
     utterance.volume = settings.volume ?? 1;
     utterance.rate = settings.rate ?? 1;
-    utterance.onend = () => setBusy(false);
+    utterance.onend = () => {
+      setBusy(false);
+      setPlayback((p) =>
+        p ? { ...p, offset: p.duration, started: null } : null,
+      );
+    };
     utterance.onerror = (e) => {
+      setPlayback((p) => (p ? { ...p, started: null } : null));
       if (e.error !== "canceled" && e.error !== "interrupted")
         setNotice("error");
       setBusy(false);
@@ -154,6 +164,28 @@ export default function App() {
     setBusy(true);
     synth.speak(utterance);
     return true;
+  }
+  function playHistory(item, offset = 0) {
+    const normalized = normalizeText(item.text, item.clean);
+    const chars = [...normalized];
+    const duration = estimateDuration(normalized, item.rate);
+    if (offset >= duration) {
+      stop();
+      setPlayback({ id: item.id, offset: duration, duration, started: null });
+      return;
+    }
+    let index = Math.floor((Math.max(0, offset) / duration) * chars.length);
+    // Use a word boundary when one is nearby; CJK text may have no spaces.
+    const nextSpace = chars.indexOf(" ", index);
+    if (index > 0 && nextSpace >= index && nextSpace - index < 15)
+      index = nextSpace + 1;
+    if (index >= chars.length) index = Math.max(0, chars.length - 1);
+    speakText(chars.slice(index).join(""), item, {
+      id: item.id,
+      offset: (duration * index) / chars.length,
+      duration,
+      started: Date.now(),
+    });
   }
   async function generate() {
     if (!speakText(text)) return;
@@ -175,6 +207,22 @@ export default function App() {
     }
   }
   function stop() {
+    setPlayback((p) =>
+      p
+        ? {
+            ...p,
+            offset: Math.min(
+              p.duration,
+              p.offset + (p.started ? (Date.now() - p.started) / 1000 : 0),
+            ),
+            started: null,
+          }
+        : null,
+    );
+    if (utteranceRef.current) {
+      utteranceRef.current.onend = null;
+      utteranceRef.current.onerror = null;
+    }
     window.speechSynthesis?.cancel();
     setBusy(false);
     recognition.current?.stop();
@@ -495,7 +543,7 @@ export default function App() {
                   {t.clean}
                 </label>
                 <button className="text-button" onClick={() => setText("")}>
-                  {t.clear}
+                  ⌫ {t.clear}
                 </button>
               </div>
               <p className="hint">{t.cleanHelp}</p>
@@ -514,23 +562,25 @@ export default function App() {
                 value={options.language}
                 onChange={(value) => option("language", value)}
               />
-              <Choice
-                label={t.voice}
-                value={
-                  selectVoice(voices, options.language, options.voiceURI)
-                    ?.voiceURI || ""
-                }
-                onChange={(value) => option("voiceURI", value)}
-                items={voices
-                  .filter(
-                    (v) =>
-                      v.lang.toLowerCase().split(/[-_]/)[0] ===
-                      options.language,
-                  )
-                  .map((v) => ({ value: v.voiceURI, label: v.name }))}
-              />
-              {!selectVoice(voices, options.language, options.voiceURI) && (
-                <p className="hint">{t.noVoice}</p>
+              {voices.some(
+                (v) =>
+                  v.lang.toLowerCase().split(/[-_]/)[0] === options.language,
+              ) && (
+                <Choice
+                  label={t.voice}
+                  value={
+                    selectVoice(voices, options.language, options.voiceURI)
+                      ?.voiceURI || ""
+                  }
+                  onChange={(value) => option("voiceURI", value)}
+                  items={voices
+                    .filter(
+                      (v) =>
+                        v.lang.toLowerCase().split(/[-_]/)[0] ===
+                        options.language,
+                    )
+                    .map((v) => ({ value: v.voiceURI, label: v.name }))}
+                />
               )}
               <label className="field">
                 {t.volume}
@@ -557,7 +607,7 @@ export default function App() {
                 />
               </label>
               <button className="primary" disabled={busy} onClick={generate}>
-                {busy ? t.working : t.generate}{" "}
+                {busy ? t.working : <>▶ {t.generate}</>}{" "}
                 <span aria-hidden="true">↗</span>
               </button>
               {busy && <button onClick={stop}>{t.stop}</button>}
@@ -588,10 +638,10 @@ export default function App() {
                       )
                     }
                   >
-                    {t.export}
+                    ↥ {t.export}
                   </button>
                   <button onClick={() => importInput.current.click()}>
-                    {t.import}
+                    ↧ {t.import}
                   </button>
                   <input
                     ref={importInput}
@@ -616,10 +666,12 @@ export default function App() {
                       <p>{item.text}</p>
                     </div>
                     <AudioPlayer blob={item.blob} />
-                    <button onClick={() => speakText(item.text, item)}>
-                      ▶ {t.speak}
-                    </button>
-                    {busy && <button onClick={stop}>{t.stop}</button>}
+                    <HistoryControls
+                      item={item}
+                      playback={playback}
+                      onSeek={playHistory}
+                      locale={locale}
+                    />
                     <div className="actions">
                       {item.blob && (
                         <button
@@ -633,24 +685,15 @@ export default function App() {
                           {t.download} {item.format?.toUpperCase()}
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setText(item.text);
-                          setOptions({
-                            ...freshDefaults,
-                            ...Object.fromEntries(
-                              Object.keys(freshDefaults)
-                                .filter((k) => item[k] !== undefined)
-                                .map((k) => [k, item[k]]),
-                            ),
-                          });
-                        }}
-                      >
-                        {t.speak}
+                      <button onClick={() => playHistory(item)}>
+                        ▶ {t.speak}
                       </button>
-                      <button onClick={() => rename(item)}>{t.rename}</button>
+                      {busy && playback?.id === item.id && (
+                        <button onClick={stop}>■ {t.stop}</button>
+                      )}
+                      <button onClick={() => rename(item)}>✎ {t.rename}</button>
                       <button onClick={() => remove(item.id)}>
-                        {t.remove}
+                        ⌫ {t.remove}
                       </button>
                     </div>
                   </article>
@@ -678,13 +721,13 @@ export default function App() {
                 disabled={!Recognition || busy}
                 onClick={recording ? stop : startMic}
               >
-                {recording ? t.stop : t.mic}
+                {recording ? t.stop : <>● {t.mic}</>}
               </button>
               <button
                 disabled={recording || busy || !fileRecognition}
                 onClick={() => fileInput.current.click()}
               >
-                {t.upload}
+                ↥ {t.upload}
               </button>
               <input
                 hidden
@@ -719,9 +762,9 @@ export default function App() {
             )}
             <div className="actions">
               <button disabled={!transcript} onClick={() => copy(transcript)}>
-                {t.copy}
+                ⧉ {t.copy}
               </button>
-              <button onClick={() => setTranscript("")}>{t.clear}</button>
+              <button onClick={() => setTranscript("")}>⌫ {t.clear}</button>
             </div>
             {recorded && (
               <div className="result">
@@ -813,7 +856,7 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <p className="hint">
+            <p className="hint translation-note">
               {window.Translator ? t.downloadModel : t.unsupportedTranslator}
             </p>
             {progress !== null && (
@@ -823,16 +866,13 @@ export default function App() {
                 aria-label={t.downloadModel}
               />
             )}
-            <div className="actions">
+            <div className="actions translation-action">
               <button
                 className="primary"
                 disabled={busy || (!window.Translator && source !== target)}
                 onClick={translate}
               >
                 {busy ? t.working : t.translateAction}
-              </button>
-              <button disabled={!translated} onClick={() => copy(translated)}>
-                {t.copy}
               </button>
             </div>
           </section>

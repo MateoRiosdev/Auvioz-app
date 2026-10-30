@@ -8,9 +8,7 @@ export const languages = [
   ["ja", "日本語", "JP", "ja-JP"],
   ["zh", "简体中文", "CN", "zh-CN"],
   ["ru", "Русский", "RU", "ru-RU"],
-  ["ar", "العربية", "SA", "ar-SA"],
   ["hi", "हिन्दी", "IN", "hi-IN"],
-  ["tr", "Türkçe", "TR", "tr-TR"],
 ].map(([code, name, country, locale]) => ({
   code,
   name,

@@ -608,3 +608,61 @@ footer > span:first-child {
 .settings .field {
   min-width: 0;
 }
+.copyright {
+  font-size: 15px;
+  line-height: 1.8;
+}
+.translation-note {
+  text-align: center;
+}
+.translation-action {
+  justify-content: center;
+}
+.history-timeline {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.timeline-controls input {
+  flex: 1;
+  min-width: 90px;
+  accent-color: var(--accent);
+}
+.timeline-controls output {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  min-width: 100px;
+}
+.history-timeline small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 8px;
+}
+.intro-play {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 30px;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .history-item .actions {
+    justify-content: center;
+  }
+  .copyright {
+    font-size: 14px;
+    text-align: center;
+  }
+  .timeline-controls output {
+    width: 100%;
+    text-align: center;
+  }
+}

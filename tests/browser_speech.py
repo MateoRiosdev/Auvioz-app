@@ -17,13 +17,17 @@ with sync_playwright() as p:
  assert page.evaluate('window.__spoken[0].voice')=='jorge'
  page.reload();page.locator('.history-item').wait_for()
  page.locator('.history-item').get_by_role('button',name='▶ Hablar',exact=True).click()
+ assert page.locator('.history-timeline output').inner_text().startswith('≈')
+ page.locator('.history-timeline input').fill('1')
+ page.wait_for_function('window.__spoken.length > 1')
+ assert page.evaluate('window.__spoken.at(-1).text') != 'Hola, prueba del historial.'
  assert page.evaluate('window.__spoken[0].text')=='Hola, prueba del historial.'
  page.get_by_role('button',name='Traducir',exact=True).click()
  page.get_by_role('textbox',name='Origen',exact=True).fill('Texto para escuchar')
  page.get_by_role('button',name='Hablar · Origen',exact=True).click()
  assert page.get_by_role('button',name='Copiar · Origen').is_enabled()
  assert page.evaluate('window.__spoken.at(-1).text')=='Texto para escuchar'
- page.locator('header .choice-trigger').click();page.get_by_role('option',name='English',exact=True).click()
+ page.locator('header .choice-trigger').click();assert page.get_by_role('option').count()==10;page.get_by_role('option',name='English',exact=True).click()
  assert page.locator('html').get_attribute('lang')=='en'
  page.reload();page.locator('header').wait_for();assert page.locator('html').get_attribute('lang')=='en'
  page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')

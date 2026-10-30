@@ -4,7 +4,7 @@ base=os.environ.get('AUVIOZ_TEST_URL','http://127.0.0.1:3003')
 with sync_playwright() as p:
  b=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
  for width,number in [(390,1),(1440,2)]:
-  page=b.new_page(viewport={'width':width,'height':850})
+  page=b.new_page(locale='es-ES',viewport={'width':width,'height':850})
   page.goto(base)
   video=page.locator('video');assert video.get_attribute('src').endswith(f'_{number}.mp4')
   page.wait_for_function('document.querySelector("video").currentTime > 0')

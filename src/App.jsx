@@ -1,3 +1,5 @@
+import Choice from "./Choice";
+import { initialLanguage, selectVoice } from "./speech";
 import Intro from "./Intro";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { languages, messages } from "./i18n";
@@ -6,28 +8,18 @@ import { normalizeText } from "../shared/text.js";
 import "./App.css";
 
 function Language({ value, onChange, label, disabled = false }) {
-  const current = languages.find((l) => l.code === value) || languages[0];
   return (
-    <label className="field">
-      {label}
-      <span className="language-control">
-        <span className="flag" aria-hidden="true">
-          <img src={`/flags/${current.country.toLowerCase()}.svg`} alt="" />
-        </span>
-        <select
-          aria-label={label}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-        >
-          {languages.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-      </span>
-    </label>
+    <Choice
+      label={label}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      items={languages.map((l) => ({
+        value: l.code,
+        label: l.name,
+        flag: `/flags/${l.country.toLowerCase()}.svg`,
+      }))}
+    />
   );
 }
 function AudioPlayer({ blob }) {
@@ -55,36 +47,38 @@ const freshDefaults = {
 };
 
 export default function App() {
-  const [showIntro,setShowIntro]=useState(true);
-  const finishIntro=useCallback(()=>setShowIntro(false),[]);
-  const [locale, setLocale] = useState(() => {
-    try {
-      return languages.some(
-        (l) => l.code === localStorage.getItem("auvioz-language"),
-      )
-        ? localStorage.getItem("auvioz-language")
-        : "es";
-    } catch {
-      return "es";
-    }
-  });
+  const [showIntro, setShowIntro] = useState(true);
+  const finishIntro = useCallback(() => setShowIntro(false), []);
+  const [locale, setLocale] = useState(initialLanguage);
   const t = messages[locale];
   const [dark, setDark] = useState(false),
     [tab, setTab] = useState("speak"),
     [text, setText] = useState(""),
-    [options, setOptions] = useState(freshDefaults),
-    [engine, setEngine] = useState("local");
+    [options, setOptions] = useState(() => ({
+      ...freshDefaults,
+      language: locale,
+    }));
+  const [voices, setVoices] = useState(
+    () => window.speechSynthesis?.getVoices() || [],
+  );
+  const utteranceRef = useRef(null);
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const update = () => setVoices(synth.getVoices());
+    synth.addEventListener("voiceschanged", update);
+    return () => synth.removeEventListener("voiceschanged", update);
+  }, []);
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [history, setHistory] = useState([]),
-    [result, setResult] = useState(null),
-    [health, setHealth] = useState(null);
-  const [speechLanguage, setSpeechLanguage] = useState("es"),
+    [result, setResult] = useState(null);
+  const [speechLanguage, setSpeechLanguage] = useState(locale),
     [transcript, setTranscript] = useState(""),
     [interim, setInterim] = useState(""),
     [recording, setRecording] = useState(false),
     [recorded, setRecorded] = useState(null);
-  const [source, setSource] = useState("es"),
+  const [source, setSource] = useState(locale),
     [target, setTarget] = useState("en"),
     [original, setOriginal] = useState(""),
     [translated, setTranslated] = useState(""),
@@ -92,7 +86,6 @@ export default function App() {
   const recognition = useRef(null),
     resources = useRef(null),
     translator = useRef(null),
-    abort = useRef(null),
     mounted = useRef(true),
     fileInput = useRef(null),
     importInput = useRef(null);
@@ -115,15 +108,8 @@ export default function App() {
       .catch(() => {
         if (mounted.current) setNotice("error");
       });
-    fetch("/api/health")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((value) => {
-        if (mounted.current) setHealth(value);
-      })
-      .catch(() => {});
     return () => {
       mounted.current = false;
-      abort.current?.abort();
       recognition.current?.abort();
       resources.current?.();
       translator.current?.destroy();
@@ -131,67 +117,64 @@ export default function App() {
     };
   }, []);
   const option = (key, value) => setOptions((o) => ({ ...o, [key]: value }));
-  async function generate() {
-    if (!normalizeText(text, options.clean)) {
+  function speakText(value, settings = options) {
+    const normalized = normalizeText(value, settings.clean);
+    if (!normalized) {
       setNotice("emptyText");
-      return;
+      return false;
     }
+    const synth = window.speechSynthesis;
+    const voice = selectVoice(
+      synth?.getVoices() || [],
+      settings.language,
+      settings.voiceURI,
+    );
+    if (!synth || !voice) {
+      setNotice("noVoice");
+      return false;
+    }
+    if (utteranceRef.current) {
+      utteranceRef.current.onend = null;
+      utteranceRef.current.onerror = null;
+    }
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(normalized);
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    utterance.volume = settings.volume ?? 1;
+    utterance.rate = settings.rate ?? 1;
+    utterance.onend = () => setBusy(false);
+    utterance.onerror = (e) => {
+      if (e.error !== "canceled" && e.error !== "interrupted")
+        setNotice("error");
+      setBusy(false);
+    };
+    utteranceRef.current = utterance;
     setNotice("");
     setBusy(true);
-    if (engine === "browser") {
-      const synth = window.speechSynthesis;
-      if (!synth || !synth.getVoices().length) {
-        setNotice("noVoice");
-        setBusy(false);
-        return;
-      }
-      synth.cancel();
-      const utterance = new SpeechSynthesisUtterance(
-        normalizeText(text, options.clean),
-      );
-      utterance.lang = languages.find(
-        (l) => l.code === options.language,
-      ).locale;
-      utterance.volume = options.volume;
-      utterance.rate = options.rate;
-      utterance.onend = () => setBusy(false);
-      utterance.onerror = () => {
-        setNotice("error");
-        setBusy(false);
-      };
-      synth.speak(utterance);
-      return;
-    }
-    abort.current = new AbortController();
+    synth.speak(utterance);
+    return true;
+  }
+  async function generate() {
+    if (!speakText(text)) return;
+    const voice = selectVoice(voices, options.language, options.voiceURI);
+    const item = {
+      ...options,
+      voiceURI: voice?.voiceURI,
+      id: crypto.randomUUID(),
+      created: Date.now(),
+      name: text.trim().slice(0, 45),
+      text,
+    };
+    setResult(item);
+    setHistory((h) => [item, ...h]);
     try {
-      const response = await fetch("/api/synthesize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...options, text }),
-        signal: abort.current.signal,
-      });
-      if (!response.ok) throw new Error();
-      const blob = await response.blob();
-      if (!blob.type.startsWith("audio/") || blob.size < 100) throw new Error();
-      const item = {
-        id: crypto.randomUUID(),
-        created: Date.now(),
-        name: text.trim().slice(0, 45),
-        text,
-        ...options,
-        blob,
-      };
-      setResult(item);
       await historyStore("put", item);
-      setHistory((h) => [item, ...h]);
-    } catch (error) {
-      if (error.name !== "AbortError") setNotice("error");
-    } finally {
-      setBusy(false);
+    } catch {
+      setNotice("error");
     }
   }
   function stop() {
-    abort.current?.abort();
     window.speechSynthesis?.cancel();
     setBusy(false);
     recognition.current?.stop();
@@ -395,12 +378,25 @@ export default function App() {
           throw new Error();
         return {
           ...freshDefaults,
-          language: languages.some(l => l.code === row.language) ? row.language : 'es',
-          volume: Number.isFinite(row.volume) && row.volume >= .1 && row.volume <= 1 ? row.volume : 1,
-          rate: Number.isFinite(row.rate) && row.rate >= .5 && row.rate <= 2 ? row.rate : 1,
-          sampleRate: [16000,22050,24000,44100,48000].includes(row.sampleRate) ? row.sampleRate : 24000,
-          format: row.format === 'mp3' ? 'mp3' : 'wav',
-          clean: typeof row.clean === 'boolean' ? row.clean : true,
+          voiceURI: typeof row.voiceURI === "string" ? row.voiceURI : "",
+          language: languages.some((l) => l.code === row.language)
+            ? row.language
+            : "es",
+          volume:
+            Number.isFinite(row.volume) && row.volume >= 0.1 && row.volume <= 1
+              ? row.volume
+              : 1,
+          rate:
+            Number.isFinite(row.rate) && row.rate >= 0.5 && row.rate <= 2
+              ? row.rate
+              : 1,
+          sampleRate: [16000, 22050, 24000, 44100, 48000].includes(
+            row.sampleRate,
+          )
+            ? row.sampleRate
+            : 24000,
+          format: row.format === "mp3" ? "mp3" : "wav",
+          clean: typeof row.clean === "boolean" ? row.clean : true,
           text: value,
           name:
             typeof row.name === "string"
@@ -422,13 +418,19 @@ export default function App() {
     setNotice("");
     setTab(next);
   }
-  const unavailable = health === null;
-  if(showIntro) return <Intro locale={locale} onDone={finishIntro}/>;
+
+  if (showIntro) return <Intro locale={locale} onDone={finishIntro} />;
   return (
     <div className={dark ? "app dark" : "app"}>
       <header>
         <a className="brand" href="#">
-          <img className="brand-logo" src="/logo_auvioz.jpg" alt="" width="48" height="48" />
+          <img
+            className="brand-logo"
+            src="/logo_auvioz.jpg"
+            alt=""
+            width="48"
+            height="48"
+          />
           <strong>
             Auvioz<span>®</span>
           </strong>
@@ -448,7 +450,7 @@ export default function App() {
         <div className="intro">
           <span className="eyebrow">AUVIOZ STUDIO</span>
           <h1>{t.slogan}</h1>
-          <p>{t.local}</p>
+          <p>{t.browserVoice}</p>
         </div>
         <nav aria-label="Auvioz">
           <div className="tabs">
@@ -499,14 +501,10 @@ export default function App() {
               <p className="hint">{t.cleanHelp}</p>
               {result && (
                 <div className="result">
-                  <AudioPlayer blob={result.blob} />
-                  <button
-                    onClick={() =>
-                      download(result.blob, `auvioz.${result.format}`)
-                    }
-                  >
-                    {t.download} {result.format.toUpperCase()}
+                  <button onClick={() => speakText(result.text, result)}>
+                    ▶ {t.speak}
                   </button>
+                  {busy && <button onClick={stop}>{t.stop}</button>}
                 </div>
               )}
             </section>
@@ -516,16 +514,24 @@ export default function App() {
                 value={options.language}
                 onChange={(value) => option("language", value)}
               />
-              <label className="field">
-                {t.voice}
-                <select
-                  value={engine}
-                  onChange={(e) => setEngine(e.target.value)}
-                >
-                  <option value="local">{t.serverVoice}</option>
-                  <option value="browser">{t.browserVoice}</option>
-                </select>
-              </label>
+              <Choice
+                label={t.voice}
+                value={
+                  selectVoice(voices, options.language, options.voiceURI)
+                    ?.voiceURI || ""
+                }
+                onChange={(value) => option("voiceURI", value)}
+                items={voices
+                  .filter(
+                    (v) =>
+                      v.lang.toLowerCase().split(/[-_]/)[0] ===
+                      options.language,
+                  )
+                  .map((v) => ({ value: v.voiceURI, label: v.name }))}
+              />
+              {!selectVoice(voices, options.language, options.voiceURI) && (
+                <p className="hint">{t.noVoice}</p>
+              )}
               <label className="field">
                 {t.volume}
                 <output>{Math.round(options.volume * 100)}%</output>
@@ -550,34 +556,6 @@ export default function App() {
                   onChange={(e) => option("rate", +e.target.value)}
                 />
               </label>
-              <div className="pair">
-                <label className="field">
-                  {t.sample}
-                  <select
-                    disabled={engine === "browser"}
-                    value={options.sampleRate}
-                    onChange={(e) => option("sampleRate", +e.target.value)}
-                  >
-                    {[16000, 22050, 24000, 44100, 48000].map((rate) => (
-                      <option key={rate} value={rate}>
-                        {rate.toLocaleString(locale)} Hz
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  {t.audioFile}
-                  <select
-                    disabled={engine === "browser"}
-                    value={options.format}
-                    onChange={(e) => option("format", e.target.value)}
-                  >
-                    <option value="wav">WAV</option>
-                    <option value="mp3">MP3</option>
-                  </select>
-                </label>
-              </div>
-              {unavailable && <p className="hint">{t.engineMissing}</p>}
               <button className="primary" disabled={busy} onClick={generate}>
                 {busy ? t.working : t.generate}{" "}
                 <span aria-hidden="true">↗</span>
@@ -638,6 +616,10 @@ export default function App() {
                       <p>{item.text}</p>
                     </div>
                     <AudioPlayer blob={item.blob} />
+                    <button onClick={() => speakText(item.text, item)}>
+                      ▶ {t.speak}
+                    </button>
+                    {busy && <button onClick={stop}>{t.stop}</button>}
                     <div className="actions">
                       {item.blob && (
                         <button
@@ -775,6 +757,28 @@ export default function App() {
                   onChange={(e) => setOriginal(e.target.value)}
                   placeholder={t.placeholder}
                 />
+                <div className="actions">
+                  <button
+                    aria-label={t.copy + " · " + t.source}
+                    disabled={!original}
+                    onClick={() => copy(original)}
+                  >
+                    ⧉ {t.copy}
+                  </button>
+                  <button
+                    aria-label={t.speak + " · " + t.source}
+                    disabled={!original}
+                    onClick={() =>
+                      speakText(original, {
+                        ...options,
+                        language: source,
+                        voiceURI: "",
+                      })
+                    }
+                  >
+                    ▶ {t.speak}
+                  </button>
+                </div>
               </div>
               <div>
                 <Language
@@ -784,6 +788,29 @@ export default function App() {
                   disabled={busy}
                 />
                 <textarea aria-label={t.target} readOnly value={translated} />
+                <div className="actions">
+                  <button
+                    aria-label={t.copy + " · " + t.target}
+                    disabled={!translated}
+                    onClick={() => copy(translated)}
+                  >
+                    ⧉ {t.copy}
+                  </button>
+                  <button
+                    aria-label={t.speak + " · " + t.target}
+                    disabled={!translated}
+                    onClick={() =>
+                      speakText(translated, {
+                        ...options,
+                        language: target,
+                        voiceURI: "",
+                      })
+                    }
+                  >
+                    ▶ {t.speak}
+                  </button>
+                  {busy && <button onClick={stop}>{t.stop}</button>}
+                </div>
               </div>
             </div>
             <p className="hint">
@@ -811,10 +838,16 @@ export default function App() {
           </section>
         )}
       </main>
-      <footer>
-        <span>Auvioz</span>
-        <span>{t.slogan}</span>
-        <span>© {new Date().getFullYear()} MateoRiosdev</span>
+      <footer className="copyright">
+        © 2026 —{" "}
+        <a
+          href="https://github.com/MateoRiosdev"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          (MateoRiosdev)
+        </a>{" "}
+        · Todos los derechos reservados
       </footer>
     </div>
   );

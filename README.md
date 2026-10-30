@@ -1,63 +1,34 @@
 # Auvioz
 
-**Habla, transcribe y traduce.** Interfaz React con 12 idiomas, voz local descargable, reconocimiento de voz del navegador y Chromium Translator.
+**Habla, transcribe y traduce.** Interfaz en 12 idiomas, lista para alojamiento estático en Vercel.
 
-## Desarrollo
+## Desarrollo y despliegue
 
-Requisitos: Node.js 22.12+ (validado con 24.19), npm, **eSpeak NG 1.52+**, **FFmpeg con libmp3lame** y ffprobe para las pruebas. En Debian/Ubuntu, instala los motores con `sudo apt-get install espeak-ng ffmpeg`.
+Node 22.12+ y npm. Ejecuta `npm ci` y `npm run dev`. `npm run build` genera `dist`; `npm run preview` permite comprobar ese resultado. En Vercel, selecciona Vite, build `npm run build`, salida `dist` y rama de producción `final`.
 
-```sh
-npm ci
-npm run dev
-```
+La interfaz ya no llama al servidor local de eSpeak/FFmpeg. No necesita claves ni backend para sintetizar voz con Web Speech. Los archivos `server/` se conservan como implementación anterior opcional, fuera del flujo actual.
 
-Vite usa el puerto 5173 y reenvía `/api` al servidor Node en 3001. Ambos procesos arrancan con `npm run dev`. Si los ejecutables no están en PATH, crea `.env.local` (ignorado por Git):
+## Voz e historial
 
-```dotenv
-ESPEAK_BIN=/ruta/al/ejecutable/espeak-ng
-FFMPEG_BIN=/ruta/al/ejecutable/ffmpeg
-```
+La lista de voces se actualiza con `voiceschanged` y muestra las voces instaladas para el idioma elegido. Se respeta la selección explícita; si existe una voz española con nombre masculino conocido, se preselecciona. La API no expone género y las voces dependen del dispositivo: no se puede crear una voz que el sistema no ofrece.
 
-En el entorno cloud preparado, eSpeak está instalado sin privilegios en `/workspace/auvioz-tools`; `.env.local` ya apunta a su ejecutable. Estos archivos locales no forman parte del repositorio.
+El historial guarda texto, idioma, voz, volumen y velocidad en IndexedDB. Permite volver a sintetizar cada frase, incluso tras recargar. No almacena un archivo grabado de Web Speech ni ofrece descargas MP3/WAV. Los audios antiguos que ya estaban almacenados siguen pudiendo reproducirse y descargarse. JSON exporta texto y ajustes.
 
-```sh
-npm run build
-npm start
-```
+La opción de omitir símbolos conserva puntuación para pausas y letras/marcas Unicode. El idioma inicial respeta una selección guardada y, en su ausencia, `navigator.languages`; no requiere geolocalización IP. Se usa inglés si ninguna preferencia es compatible.
 
-En producción, Node sirve `dist` y la API desde el mismo origen. **Un despliegue exclusivamente estático no puede generar descargas**: se necesita el proceso Node con los motores instalados. `HOST` y `PORT` configuran la escucha (por defecto 127.0.0.1:3001); usa HTTPS para micrófono y APIs del navegador fuera de localhost. `AUVIOZ_ALLOWED_ORIGINS` acepta orígenes adicionales separados por comas (por defecto, el origen local de desarrollo). No hay claves ni proveedores de pago. Para publicar un servicio abierto, añade autenticación/cuotas en el proxy; la API limita longitud del texto y concurrencia, pero no implementa cuentas de usuario.
+## Transcripción y traducción
 
-## Funciones y límites reales
+SpeechRecognition requiere un navegador compatible y permisos; puede usar servicios externos del proveedor. El reconocimiento de archivos mediante `start(audioTrack)` es experimental en Chromium 135+. Translator también depende de compatibilidad y modelos descargables. Ambos lados del traductor tienen copiar y escuchar con el idioma correspondiente. Ninguna prueba con dobles sustituye una comprobación real del proveedor.
 
-- **Audio local:** eSpeak genera voz y FFmpeg aplica volumen, velocidad del motor y frecuencia de muestreo. WAV PCM o MP3 reales; reproducción y descarga usan el mismo Blob. Su calidad es sintética/robótica. Cambiar la frecuencia no mejora el detalle de la voz original. Volumen de 10–100% para evitar exportaciones silenciosas accidentales.
-- **Voz del navegador:** opción de escucha con Web Speech, dependiente de las voces del sistema. No produce archivos ni admite elegir frecuencia de muestreo; los controles correspondientes se desactivan.
-- **Símbolos:** opción que quita símbolos como `/` y `#` conservando letras, marcas Unicode y puntuación para pausas naturales. La duración exacta depende del motor.
-- **Historial:** IndexedDB conserva texto, ajustes y el Blob de audio entre recargas. Exportar JSON guarda texto y ajustes, **no binarios de audio**. Descarga los audios por separado. Importar acepta también el campo `texto` del historial antiguo; permite regenerar audios, renombrarlos y eliminarlos.
-- **Transcripción de micrófono:** `SpeechRecognition`/`webkitSpeechRecognition` y `MediaRecorder` para conservar la grabación original. Requiere permiso. El servicio de reconocimiento del navegador puede enviar audio a su proveedor y necesitar red.
-- **Transcripción de archivos:** decodifica audio y entrega una pista `MediaStreamTrack` a `SpeechRecognition.start(track)`. Es experimental y requiere Chromium 135+ con esta sobrecarga implementada/habilitada; detectar la versión es solo una comprobación preliminar. No se promete reconocimiento sin conexión ni compatibilidad universal. Archivos de hasta 25 MB, procesados en tiempo real. Navegadores sin soporte muestran la limitación. La grabación original se descarga en el formato soportado por MediaRecorder (WebM/Ogg/M4A), no se etiqueta falsamente como MP3.
-- **Traducción:** utiliza `Translator.availability`, `Translator.create` y `translate`; informa cuando un par no está disponible y muestra la descarga de modelos. Requiere un Chromium compatible, modelos disponibles y recursos suficientes. No sustituye la API por respuestas inventadas. Traducir al mismo idioma conserva el texto.
-- **12 idiomas de interfaz:** español, inglés, portugués, francés, alemán, italiano, japonés, chino simplificado, ruso, árabe (RTL), hindi y turco. El idioma de interfaz es independiente del idioma del audio.
+## Intro e identidad
 
-## Identidad
+Logo original: `public/logo_auvioz.jpg`. Videos originales de seis segundos en `public/media`: `_1.mp4` para hasta 760 px y `_2.mp4` para pantallas mayores. Se reproducen silenciosamente por carga, sin recorte, con omisión y Escape. Si autoplay se bloquea se ofrece reproducir manualmente; un error o espera máxima de 20 segundos permite continuar. Se respeta movimiento reducido. Se bloquean menú contextual y arrastre de la intro; esto no impide extraer los archivos con herramientas de red.
 
-Logo original incorporado en `public/logo_auvioz.jpg`, utilizado en la cabecera, el favicon y el manifiesto.
+Banderas locales de [Circle Flags](https://github.com/HatScripts/circle-flags), licencia MIT incluida en `public/flags/LICENSE.md`.
 
-## Validación
+## Comprobaciones
 
-```sh
-npm run lint
-npm run build
-# Si eSpeak está en una ruta personalizada, exporta ESPEAK_BIN para las pruebas:
-ESPEAK_BIN=/ruta/al/ejecutable/espeak-ng node tests/audio.test.mjs
-npm test
-```
-
-Las pruebas comprueban texto multilingüe y pausas, validación de entradas, cobertura de traducciones, WAV/MP3 decodificables con señal, frecuencias de 16/24/48 kHz y volumen reducido. La prueba de navegador requiere Python Playwright y Chromium: `python tests/browser_smoke.py`, con `npm run dev` activo. Comprueba descarga, persistencia del historial, 12 idiomas, RTL y móvil. Los modelos reales de Translator y el reconocimiento real de voz dependen del navegador y no se consideran validados solo por probar la interfaz.
-
-Banderas circulares: [Circle Flags de HatScripts](https://github.com/HatScripts/circle-flags), licencia MIT incluida en `public/flags/LICENSE.md`. Las pruebas `python tests/browser_apis.py` usan dobles de las APIs para verificar la integración, no servicios reales.
-
-## Intro responsive
-
-Al abrir la página se reproduce una intro silenciosa de unos seis segundos. Se selecciona `public/media/Auvioz_app_logo_animation_1.mp4` para anchos de hasta 760 px y `_2.mp4` para pantallas mayores, una sola vez por carga de página. Se conserva la proporción del video sin recortarlo. Permite omitir con el botón o Escape; respeta movimiento reducido y continúa ante errores, bloqueo de autoplay o tras 10 segundos de espera máxima.
-
-El menú contextual y arrastre se bloquean en la intro, sin controles de descarga. Esto no protege el archivo frente a herramientas de red ni impide capturas. El servidor de producción sirve `video/mp4` y admite peticiones Range para reproducción móvil. Prueba: `AUVIOZ_TEST_URL=http://127.0.0.1:3003 python tests/intro_browser.py`, con el servidor ejecutándose en ese puerto.
+- `npm run lint`, `npm run build`, `npm test`.
+- Con `npm run preview -- --port 5174`, ejecutar `python tests/browser_speech.py` (Playwright y Chromium): persistencia, voces, interfaz, idioma, traducción y móvil con un adaptador de voz controlado.
+- `AUVIOZ_TEST_URL=http://127.0.0.1:5174 python tests/intro_browser.py`: reproducción real de ambas intros, omisión, errores y movimiento reducido.
+- Las pruebas del antiguo backend están separadas en `npm run test:audio` y requieren eSpeak/FFmpeg.

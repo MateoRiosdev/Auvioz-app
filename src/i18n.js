@@ -44,3 +44,21 @@ export const messages = Object.fromEntries(
     Object.fromEntries(keys.map((key, i) => [key, row.split("|")[i]])),
   ]),
 );
+
+// Browser voices are selected directly; no engine selector is exposed.
+const voiceLabels = {
+  es: "Voz",
+  en: "Voice",
+  pt: "Voz",
+  fr: "Voix",
+  de: "Stimme",
+  it: "Voce",
+  ja: "音声",
+  zh: "语音",
+  ru: "Голос",
+  ar: "الصوت",
+  hi: "आवाज़",
+  tr: "Ses",
+};
+for (const [code, label] of Object.entries(voiceLabels))
+  messages[code].voice = label;

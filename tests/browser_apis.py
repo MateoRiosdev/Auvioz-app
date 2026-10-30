@@ -1,7 +1,7 @@
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
  b=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
- page=b.new_page()
+ page=b.new_page(locale="es-ES",reduced_motion="reduce")
  page.add_init_script('''
  window.__translated=[];
  Object.defineProperty(window,'Translator',{value:{availability:async()=> 'downloadable',create:async options=>{options.monitor({addEventListener:(name,fn)=>fn({loaded:1})});return {translate:async text=>{window.__translated.push(text);return 'Hello, world';},destroy:()=>{}};}}});

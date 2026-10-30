@@ -1,23 +1,17 @@
 {
-  "name": "VozCraft - TTS",
-  "short_name": "VozCraft",
-  "description": "Texto a voz con IA",
+  "name": "Auvioz",
+  "short_name": "Auvioz",
+  "description": "Habla, transcribe y traduce.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#2563eb",
+  "background_color": "#f5f6f8",
+  "theme_color": "#234a76",
   "icons": [
     {
-      "src": "/logo.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/logo_auvioz.jpg",
+      "sizes": "2048x2048",
+      "type": "image/jpeg",
+      "purpose": "any"
     }
   ]
 }
